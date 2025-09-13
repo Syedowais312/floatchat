@@ -4,7 +4,7 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_batch
 from sentence_transformers import SentenceTransformer
-
+import math
 
 DB_CONFIG = {
     "host": "localhost",
@@ -44,14 +44,16 @@ def ingest_nc_file(file_path, conn):
 
         # Insert depth-level rows
         level_rows = [
-            (profile_id, int(level), float(ds['PRES'][prof, level].values),
-             float(ds['TEMP'][prof, level].values), float(ds['PSAL'][prof, level].values))
+            (profile_id, int(level), 
+             float(ds['PRES'][prof, level].values),
+             float(ds['TEMP'][prof, level].values),
+             float(ds['PSAL'][prof, level].values),juld)
             for level in range(ds.sizes["N_LEVELS"])
         ]
         with conn.cursor() as cur:
             execute_batch(cur, """
-                INSERT INTO profile_levels (profile_id, N_LEVELS, PRES, TEMP, PSAL)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO profile_levels (profile_id, N_LEVELS, PRES, TEMP, PSAL,juld)
+                VALUES (%s, %s, %s, %s, %s,%s)
             """, level_rows, page_size=500)
 
         conn.commit()

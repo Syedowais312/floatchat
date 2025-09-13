@@ -1,3 +1,4 @@
+# api/main.py
 from flask import Flask, request, jsonify
 import psycopg2
 import numpy as np
@@ -6,6 +7,7 @@ from geopy.geocoders import Nominatim
 from geopy.distance import distance
 import re
 import json
+import math
 
 DB_CONFIG = {
     "host": "localhost",
@@ -14,9 +16,8 @@ DB_CONFIG = {
     "password": "Owais@786"
 }
 
-TOP_K = 3
+TOP_K = 1
 RADIUS_METERS = 50_000
-
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def get_embedding(text):
@@ -45,58 +46,65 @@ def query_profiles(user_query):
     lat, lon = extract_lat_lon(user_query)
     if lat is None or lon is None:
         lat, lon = geocode_place(user_query)
-
+    
     query_emb = get_embedding(user_query)
-
+    
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
-
+    
     cur.execute("SELECT id, latitude, longitude, juld, embedding FROM profiles")
     profiles = cur.fetchall()
-
+    
     sims = []
     for profile in profiles:
         profile_id, plat, plon, juld, emb = profile
-
         if isinstance(emb, str):
             emb = json.loads(emb)
-
+        
         if lat is not None and lon is not None:
             dist = distance((lat, lon), (plat, plon)).meters
             if dist > RADIUS_METERS:
                 continue
         else:
             dist = 0
-
+        
         sim = cosine_similarity(query_emb, emb)
         distance_score = 1 / (1 + dist)
         combined_score = 0.7 * sim + 0.3 * distance_score
-
         sims.append((combined_score, profile_id, plat, plon, juld))
-
+    
     top_profiles = sorted(sims, key=lambda x: x[0], reverse=True)[:TOP_K]
-
+    
     results = []
-    for _, profile_id, plat, plon, juld in top_profiles:
+    for _, profile_id, plat, plon, juld in top_profiles:  # FIXED: removed asterisks
         cur.execute("""
             SELECT pres, temp, psal
             FROM profile_levels
             WHERE profile_id = %s
             ORDER BY n_levels ASC
+            LIMIT 15
         """, (profile_id,))
         levels = cur.fetchall()
-
+        
+        # Filter NaN and None values and limit to 15 valid records
+        depth_levels = []
+        for l in levels:  # FIXED: proper indentation
+            pres, temp, sal = l
+            if pres is None or temp is None or sal is None:  # FIXED: proper indentation
+                continue
+            if math.isnan(pres) or math.isnan(temp) or math.isnan(sal):  # FIXED: proper indentation
+                continue
+            depth_levels.append({"pres": pres, "temp": temp, "salinity": sal})
+        
         results.append({
             "profile_id": profile_id,
             "lat": plat,
             "lon": plon,
             "time": juld.strftime("%Y-%m-%d %H:%M:%S"),
-            "depth_levels": [
-                {"pres": l[0], "temp": l[1], "salinity": l[2]} for l in levels
-            ],
+            "depth_levels": depth_levels,
             "query_explain": f"Matched using weighted embedding similarity and proximity for: '{user_query}'"
         })
-
+    
     conn.close()
     return results
 
@@ -108,7 +116,7 @@ def query():
     user_query = data.get("query")
     if not user_query:
         return jsonify({"error": "Missing 'query' field"}), 400
-
+    
     try:
         results = query_profiles(user_query)
         return jsonify(results)
@@ -119,6 +127,5 @@ def query():
 def home():
     return jsonify({"message": "FloatChat API is running 🚀"})
 
-
-if __name__ == "__main__":
+if __name__ == "__main__":  # FIXED: double underscores
     app.run(debug=True)
