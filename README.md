@@ -215,6 +215,52 @@ python main.py
 
 ---
 
+## Dockerized Deployment
+
+You can run the entire Streamlit experience inside a container.
+
+1. **Build the image**
+   ```bash
+   docker build -t floatchat:latest .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run --rm -p 8501:8501 \
+     --env-file .env \
+     floatchat:latest
+   ```
+
+   - The UI will be served at [http://localhost:8501](http://localhost:8501)
+   - Provide your `.env` so the app can reach Gemini or other APIs when needed.
+
+3. **Health check endpoint**
+   The container exposes `/ _stcore/health` which is used by the Docker `HEALTHCHECK` instruction.
+
+---
+
+## CI/CD Workflow (GitHub Actions)
+
+File: `.github/workflows/ci.yml`
+
+This workflow runs on every push or pull request to `main`:
+
+- **`test` job**
+  - Checks out the repo
+  - Installs Python 3.11 and project dependencies
+  - Runs `python -m compileall ...` as a lightweight syntax and import check
+
+- **`docker` job**
+  - Builds the Docker image using BuildKit
+  - Pushes the `latest` tag to GitHub Container Registry (`ghcr.io`) on successful pushes to `main`
+
+### Customization Notes
+- To push to another registry (Docker Hub, AWS ECR, etc.), update the `REGISTRY`, `IMAGE_NAME`, and login step accordingly.
+- Add more quality gates (pytest, linting, etc.) by inserting steps into the `test` job.
+- Set additional secrets under the repository settings if you need third-party registry credentials.
+
+---
+
 ## Key Features
 
 ### Natural Language Interface

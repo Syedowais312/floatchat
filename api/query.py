@@ -14,24 +14,32 @@ from flask_cors import CORS
 
 
 load_dotenv()
+HOST_NAME=os.getenv("HOST_NAME", default=None)
+PASSWORD=os.getenv("PASSWORD", default=None)
+USER=os.getenv("USER_NAME", default=None)
+DB_NAME=os.getenv("DATABASE_NAME", default=None)
 DB_CONFIG = {
-    "host": "localhost",
-    "database": "floatchatai",
-    "user": "postgres",
-    "password": "Owais@786"
+    "host": HOST_NAME,
+    "database": DB_NAME,
+    "user": USER,
+    "password": PASSWORD
 }
 
 TOP_K = 1
 RADIUS_METERS = 50_000
 model = SentenceTransformer("all-MiniLM-L6-v2")
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path)
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
-dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-load_dotenv(dotenv_path)
 
-print("Loaded Gemini API key:", os.getenv("GOOGLE_API_KEY"))
-
+print("DB_CONFIG:", DB_CONFIG)
+print("HOST_NAME:", HOST_NAME)
+print("PASSWORD:", PASSWORD)
+print("USER:", USER)
+print("DB_NAME:", DB_NAME)
+print("GOOGLE_API_KEY:", os.getenv("GOOGLE_API_KEY"))
 def get_embedding(text):
     return model.encode(text).tolist()
 
@@ -165,5 +173,6 @@ def home():
 
 
 if __name__ == "__main__":
+    CORS(app)
     app.run(debug=True)
-CORS(app)
+
