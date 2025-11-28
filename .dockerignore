@@ -17,4 +17,6 @@ dist/
 data/
 dummy.db-journal
 *.log
-
+.test-docker.ps1
+.test-docker.ps1
+TESTING_GUIDE.md
