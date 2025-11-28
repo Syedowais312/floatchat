@@ -13,3 +13,8 @@ __pycache__/
 *.pyo
 *.pyd
 frontend/dummy.db
+
+
+.test-docker.ps1
+.test-docker.sh
+.TESTING_GUIDE.md
