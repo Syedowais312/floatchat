@@ -4,10 +4,11 @@ FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
-    STREAMLIT_SERVER_PORT=8501
+    STREAMLIT_SERVER_PORT=8501 \
+    TRANSFORMERS_CACHE=/root/.cache/huggingface \
+    HF_HOME=/root/.cache/huggingface
 
 WORKDIR /app
 
@@ -18,13 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip first (cached layer)
+# Upgrade pip, setuptools, wheel first (cached layer)
 RUN pip install --upgrade pip setuptools wheel
 
 # Copy requirements and install Python dependencies
-# This layer is cached unless requirements.txt changes
+# Using BuildKit cache mount for pip cache (faster rebuilds)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (changes frequently, so this is last)
 COPY . .
