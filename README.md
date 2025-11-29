@@ -85,6 +85,7 @@ graph TB
 ```
 floatchat-clean/
 ├── 📁 api/                     # Flask backend service
+│   ├── Dockerfile              # Multi-stage Docker build for API
 │   ├── app.py                  # Main Flask application
 │   ├── main.py                 # API entry point with CORS
 │   ├── query.py                # Advanced query processing with Gemini AI
@@ -92,6 +93,7 @@ floatchat-clean/
 │   └── requirements.txt        # Backend dependencies
 |
 ├── 📁 frontend/                # Streamlit user interface
+│   ├── Dockerfile              # Multi-stage Docker build for Frontend
 │   ├── chatbot_ui.py           # Main chat interface with visualizations
 │   ├── front.py                # Multi-page application with navigation
 │   ├── map_page.py             # Geospatial visualizations and maps
@@ -110,6 +112,9 @@ floatchat-clean/
 │   └── 20250901_prof.nc        # Sample ARGO float data
 |
 ├── 📁 infra/                   # Infrastructure and setup scripts
+├── 📁 .github/                  # GitHub Actions workflows
+│   └── workflows/
+│       └── ci.yml              # CI/CD pipeline for testing and Docker builds
 ├── dummy.db                    # SQLite demo database
 ├── requirements.txt            # Global project dependencies
 └── README.md                   # This documentation
@@ -217,25 +222,93 @@ python main.py
 
 ## Dockerized Deployment
 
-You can run the entire Streamlit experience inside a container.
+FloatChat uses multi-stage Docker builds for optimized container images. Both the API and Frontend services can be run in separate containers.
 
-1. **Build the image**
-   ```bash
-   docker build -t floatchat:latest .
-   ```
+### Building Docker Images
 
-2. **Run the container**
-   ```bash
-   docker run --rm -p 8501:8501 \
-     --env-file .env \
-     floatchat:latest
-   ```
+#### Build API Image
+```bash
+cd api
+docker build -t floatchat-api:latest .
+```
 
-   - The UI will be served at [http://localhost:8501](http://localhost:8501)
-   - Provide your `.env` so the app can reach Gemini or other APIs when needed.
+#### Build Frontend Image
+```bash
+cd frontend
+docker build -t floatchat-frontend:latest .
+```
 
-3. **Health check endpoint**
-   The container exposes `/ _stcore/health` which is used by the Docker `HEALTHCHECK` instruction.
+### Running the Containers
+
+#### Run API Container
+```bash
+docker run --rm -p 5000:5000 \
+  --env-file .env \
+  floatchat-api:latest
+```
+- API will be available at [http://localhost:5000](http://localhost:5000)
+- Ensure your `.env` file contains `GOOGLE_API_KEY` and database credentials
+
+#### Run Frontend Container
+```bash
+docker run --rm -p 8501:8501 \
+  --env-file .env \
+  floatchat-frontend:latest
+```
+- Frontend will be available at [http://localhost:8501](http://localhost:8501)
+- Ensure your `.env` file contains `QUERY_API` pointing to your API endpoint
+
+### Docker Compose (Recommended)
+
+For easier orchestration, you can use Docker Compose:
+
+```yaml
+version: '3.8'
+services:
+  api:
+    build: ./api
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=postgres
+    depends_on:
+      - postgres
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: floatchatai
+      POSTGRES_USER: floatchat_user
+      POSTGRES_PASSWORD: your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+Run with:
+```bash
+docker-compose up --build
+```
+
+### Docker Image Features
+
+- **Multi-stage builds**: Optimized image sizes by separating build and runtime stages
+- **Wheel-based installation**: Faster builds with pre-compiled Python packages
+- **Network resilience**: Configured with extended timeouts for slow network connections
+- **Production-ready**: Minimal runtime images with only necessary dependencies
 
 ---
 
@@ -246,18 +319,37 @@ File: `.github/workflows/ci.yml`
 This workflow runs on every push or pull request to `main`:
 
 - **`test` job**
-  - Checks out the repo
+  - Checks out the repository
   - Installs Python 3.11 and project dependencies
   - Runs `python -m compileall ...` as a lightweight syntax and import check
 
 - **`docker` job**
-  - Builds the Docker image using BuildKit
-  - Pushes the `latest` tag to GitHub Container Registry (`ghcr.io`) on successful pushes to `main`
+  - Builds both API and Frontend Docker images using BuildKit
+  - Uses GitHub Actions cache for faster subsequent builds
+  - Pushes both images to GitHub Container Registry (`ghcr.io`) on successful pushes to `main`:
+    - `ghcr.io/<repo-name>-api:latest`
+    - `ghcr.io/<repo-name>-frontend:latest`
+
+### Pulling Images from GitHub Container Registry
+
+After a successful build, you can pull and run the images:
+
+```bash
+# Login to GitHub Container Registry
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+
+# Pull API image
+docker pull ghcr.io/<your-username>/<repo-name>-api:latest
+
+# Pull Frontend image
+docker pull ghcr.io/<your-username>/<repo-name>-frontend:latest
+```
 
 ### Customization Notes
 - To push to another registry (Docker Hub, AWS ECR, etc.), update the `REGISTRY`, `IMAGE_NAME`, and login step accordingly.
 - Add more quality gates (pytest, linting, etc.) by inserting steps into the `test` job.
 - Set additional secrets under the repository settings if you need third-party registry credentials.
+- The workflow uses separate build contexts for API and Frontend to optimize build times.
 
 ---
 
