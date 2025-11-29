@@ -54,10 +54,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./api
+          file: ./api/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+          tags: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
