@@ -1,26 +1,12 @@
-# -------- Stage 1: Builder --------
-FROM python:3.11-slim AS builder
-
+FROM python:3.11 AS builder
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential gcc && \
-    rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip config set global.timeout 600 && \
-    pip wheel --no-cache-dir -r requirements.txt -w /wheels
+RUN pip install --upgrade pip \
+    && pip wheel -r requirements.txt -w /wheels
 
-# -------- Stage 2: Runtime --------
 FROM python:3.11-slim
-
 WORKDIR /app
-
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
-
-COPY . .
-
+RUN pip install /wheels/*
 EXPOSE 8501
-CMD ["streamlit", "run", "front.py", "--server.port=8501", "--server.address=0.0.0.0"]
+COPY . .
