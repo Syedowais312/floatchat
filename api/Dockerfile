@@ -12,7 +12,7 @@ COPY requirements.txt .
 # This significantly speeds up builds and reduces image size
 RUN pip install --upgrade pip && \
     pip config set global.timeout 600 && \
-    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip wheel --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu -w /wheels && \
     pip wheel --no-cache-dir -r requirements.txt -w /wheels
 
 # -------- Stage 2: Runtime --------
